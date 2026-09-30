@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#22615A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Streamside Fly Picker</title>
+<style>
+/* Layout: phone-first single column; conditions beside picks on wide screens. System fonts only, so nothing needs a download on the river. */
+:root {
+  --bg: #E7ECE5;
+  --surface: #F5F7F2;
+  --line: #C6D0C3;
+  --fg: #1B2621;
+  --muted: #56675E;
+  --accent: #22615A;
+  --accent-ink: #FFFFFF;
+  --hackle: #A1561F;
+  --hackle-soft: #F1E1D2;
+  --good: #3B7437;
+  --chip: #DCE4D8;
+  --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111916; --surface: #19231F; --line: #2D3B35; --fg: #E2E9E3; --muted: #9AABA2;
+    --accent: #62B5A8; --accent-ink: #0D1513; --hackle: #E3915A; --hackle-soft: #3A2A1E;
+    --good: #82C27C; --chip: #23302A; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111916; --surface: #19231F; --line: #2D3B35; --fg: #E2E9E3; --muted: #9AABA2;
+  --accent: #62B5A8; --accent-ink: #0D1513; --hackle: #E3915A; --hackle-soft: #3A2A1E;
+  --good: #82C27C; --chip: #23302A; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 80px; display: grid; gap: 16px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; margin: 0; text-wrap: balance; }
+h1 { font-size: 1.75rem; line-height: 1.15; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1.08rem; }
+p { margin: 0; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.sub { color: var(--muted); max-width: 52ch; }
+.net { font: 12px var(--mono); padding: 3px 8px; border-radius: 99px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+.net.off { background: var(--hackle-soft); color: var(--hackle); }
+
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--chip); border-radius: 12px; }
+.tabs button { font: 600 15px var(--body); padding: 10px; border: 0; border-radius: 9px; background: transparent; color: var(--fg); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--surface); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+.tabs .count { font: 12px var(--mono); color: var(--muted); }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.pick-layout { display: grid; gap: 20px; }
+@media (min-width: 820px) { .pick-layout { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); align-items: start; } .cond { position: sticky; top: 72px; } }
+
+.cond { display: grid; gap: 14px; margin: 0; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 6px; }
+legend { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips input { position: absolute; opacity: 0; pointer-events: none; }
+.chips label { padding: 7px 12px; border-radius: 99px; background: var(--chip); border: 1px solid transparent; cursor: pointer; user-select: none; line-height: 1.25; }
+.chips label small { display: block; font-size: 11.5px; color: var(--muted); }
+.chips input:checked + label { background: var(--accent); color: var(--accent-ink); }
+.chips input:checked + label small { color: inherit; opacity: .85; }
+.chips input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+select, input[type="text"], input[type="number"], textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+
+.results { display: grid; gap: 10px; min-width: 0; }
+.results-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rig { background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; color: var(--fg); }
+.rig b { font-weight: 600; }
+.warn { background: var(--hackle-soft); color: var(--fg); border-radius: 10px; padding: 10px 12px; }
+.pick { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; }
+.pick-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+.rank { font: 600 1.35rem/1 var(--display); color: var(--accent); min-width: 1.1em; }
+.meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pill { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 99px; white-space: nowrap; background: var(--chip); color: var(--muted); }
+.pill.have { background: var(--accent); color: var(--accent-ink); }
+.pill.low { background: var(--hackle-soft); color: var(--hackle); }
+.why { margin: 0; padding-left: 18px; color: var(--fg); font-size: 14px; display: grid; gap: 2px; }
+.subnote { font-size: 13.5px; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-weight: 600; font-size: 14px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.lost { color: var(--hackle); border-color: var(--hackle); background: transparent; }
+.btn.small { padding: 4px 9px; font-size: 13px; }
+.btn:disabled { opacity: .45; cursor: default; }
+.more { color: var(--muted); font-size: 13.5px; }
+
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.stat .num { font: 600 1.6rem/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.stat .num.lostnum { color: var(--hackle); }
+.stat .lbl { font-size: 12px; color: var(--muted); }
+.stat .num.txt { font-size: 1.05rem; line-height: 1.3; overflow-wrap: anywhere; }
+
+.banner { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; background: var(--chip); border-radius: 10px; padding: 10px 12px; }
+.addform { display: grid; grid-template-columns: minmax(0, 1fr) 90px 80px auto; gap: 8px; align-items: end; }
+.addform label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+@media (max-width: 560px) { .addform { grid-template-columns: 1fr 1fr; } .addform .namefield { grid-column: 1 / -1; } .addform button { grid-column: 1 / -1; } }
+
+.boxlist { display: grid; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.row .name { font-weight: 600; }
+.row .name .size { font: 13px var(--mono); color: var(--muted); font-weight: 400; margin-left: 4px; }
+.row .rmeta { font-size: 12.5px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row .ctrls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.stepper button { border: 0; background: transparent; width: 32px; height: 32px; cursor: pointer; font-size: 18px; line-height: 1; }
+.stepper span { min-width: 2.2ch; text-align: center; font: 600 15px var(--mono); font-variant-numeric: tabular-nums; }
+.empty { padding: 18px 12px; color: var(--muted); }
+
+.log { display: grid; gap: 0; }
+.log li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.log li time { color: var(--muted); font: 12.5px var(--mono); white-space: nowrap; }
+.log ul { list-style: none; margin: 0; padding: 0; }
+section.block { display: grid; gap: 10px; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+details summary { cursor: pointer; font-weight: 600; }
+details .inner { display: grid; gap: 8px; margin-top: 10px; }
+textarea { width: 100%; min-height: 80px; font: 12px var(--mono); }
+
+.photo { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 10px; margin-bottom: 20px; }
+.thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+.thumbs img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.ai { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.ai ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.sectlabel { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.row.out { background: var(--hackle-soft); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 10px 14px; border-radius: 10px; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); z-index: 10; box-shadow: 0 4px 16px rgb(0 0 0 / .25); }
+.toast button { background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 6px; padding: 3px 9px; cursor: pointer; font-weight: 600; }
+@media (prefers-reduced-motion: no-preference) { .pick { transition: transform .15s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Streamside Fly Picker</h1>
+      <p class="sub">Tell it what you see on the water. Everything runs on your phone, so it keeps working with no signal once it's open.</p>
+    </div>
+    <span id="net" class="net">Works offline</span>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button id="tab-pick" role="tab" aria-selected="true" aria-controls="pick">Pick a fly</button>
+    <button id="tab-box" role="tab" aria-selected="false" aria-controls="box">My fly box <span id="boxcount" class="count"></span></button>
+  </nav>
+
+  <section id="pick" role="tabpanel">
+    <div id="photo" class="photo">
+      <div class="results-head"><h2>Photo check</h2><span class="pill" id="photostatus">Checking…</span></div>
+      <p class="subnote" id="photohelp">When you get to the water and have signal (your Starlink works), take photos of the river, bugs on the water or on rocks, and any rising fish. Claude looks at them and fills in the conditions below for you.</p>
+      <div class="actions" id="photoactions" hidden>
+        <label class="btn" for="photofile">Add photos</label>
+        <input type="file" id="photofile" accept="image/*" multiple hidden>
+        <button class="btn primary" id="photogo" type="button" disabled>Read my photos</button>
+        <button class="btn" id="photoclear" type="button" hidden>Clear photos</button>
+      </div>
+      <div id="thumbs" class="thumbs"></div>
+      <div id="photoout" aria-live="polite"></div>
+    </div>
+    <div class="pick-layout">
+      <form id="cond" class="cond" onsubmit="return false"></form>
+      <div class="results" id="results" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="box" role="tabpanel" hidden>
+    <div style="display:grid;gap:16px">
+      <div class="stats" id="stats"></div>
+      <div id="exbanner" class="banner" hidden>
+        <span>These are example flies so you can see how it works. Clear them and add your own.</span>
+        <button class="btn" id="clearex" type="button">Clear examples</button>
+      </div>
+      <form id="addform" class="addform">
+        <label class="namefield">Fly pattern
+          <input type="text" id="addname" list="patterns" placeholder="e.g. Pheasant Tail Nymph" autocomplete="off" required>
+        </label>
+        <label>Hook size
+          <select id="addsize"></select>
+        </label>
+        <label>How many
+          <input type="number" id="addqty" min="1" max="99" value="1" required>
+        </label>
+        <button class="btn primary" type="submit">Add to box</button>
+        <datalist id="patterns"></datalist>
+      </form>
+      <section class="block" id="outblock" hidden>
+        <h2>Out of rotation</h2>
+        <p class="subnote">Flies you lost come off your count and stay here until you replace them. The picker won't count on them until then.</p>
+        <div class="boxlist" id="outlist"></div>
+      </section>
+      <section class="block">
+        <h2>In rotation</h2>
+        <div class="boxlist" id="boxlist"></div>
+      </section>
+      <section class="block log">
+        <h2>Lost flies</h2>
+        <p class="subnote" id="mostlost"></p>
+        <div id="log"></div>
+      </section>
+      <details>
+        <summary>Back up or move your fly box</summary>
+        <div class="inner">
+          <p class="subnote">Your box is saved on this phone only. Copy a backup and keep it in your notes app. Paste it here to restore it or to move it to another phone.</p>
+          <div class="actions"><button class="btn" type="button" id="copybk">Copy backup</button></div>
+          <textarea id="bktext" placeholder="Paste a backup here"></textarea>
+          <div class="actions"><button class="btn" type="button" id="restore">Restore from pasted backup</button><span id="bkmsg" class="subnote"></span></div>
+        </div>
+      </details>
+    </div>
+  </section>
+</div>
+<div id="toast" class="toast" hidden><span id="toastmsg"></span><button type="button" id="toastundo">Undo</button></div>
+
+<script>
+const r = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+const ALL = r(1, 12);
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const KIND = { dry: 'Dry fly', emerger: 'Emerger', nymph: 'Nymph', wet: 'Wet fly', streamer: 'Streamer' };
+const BUGS = { mayfly: 'mayflies', caddis: 'caddis', stonefly: 'stoneflies', midge: 'midges', terrestrial: 'hoppers, ants or beetles', baitfish: 'baitfish', leech: 'leeches', worm: 'worms', egg: 'eggs' };
+
+// f flags: attractor, gloom (overcast hatch), evening, sunny, cold (works in cold water), dirty (shows in off-color water), lowlight, lake (stillwater only)
+const FLIES = [
+  { id: 'padams', n: 'Parachute Adams', k: 'dry', b: ['mayfly'], s: [12, 20], m: r(4, 10), w: ['pool','riffle','tail','still'] },
+  { id: 'bwo', n: 'Blue-Winged Olive', k: 'dry', b: ['mayfly'], s: [18, 22], m: [3,4,5,9,10,11], w: ['pool','tail','riffle'], f: { gloom: 1 } },
+  { id: 'pmd', n: 'Pale Morning Dun', k: 'dry', b: ['mayfly'], s: [14, 18], m: r(6, 8), w: ['riffle','pool','tail'] },
+  { id: 'mbrown', n: 'March Brown', k: 'dry', b: ['mayfly'], s: [10, 14], m: r(4, 6), w: ['riffle','pocket'] },
+  { id: 'rs2', n: 'RS2 Emerger', k: 'emerger', b: ['mayfly','midge'], s: [18, 24], m: ALL, w: ['pool','tail'], f: { cold: 1, gloom: 1 } },
+  { id: 'ehc', n: 'Elk Hair Caddis', k: 'dry', b: ['caddis'], s: [12, 18], m: r(4, 9), w: ['riffle','pocket','pool'], f: { evening: 1 } },
+  { id: 'sparkle', n: 'Sparkle Pupa', k: 'emerger', b: ['caddis'], s: [14, 18], m: r(4, 9), w: ['riffle','pool'], f: { evening: 1 } },
+  { id: 'softhackle', n: 'Partridge & Orange Soft Hackle', k: 'wet', b: ['caddis','mayfly'], s: [12, 16], m: r(3, 10), w: ['riffle','pool','tail'] },
+  { id: 'stimi', n: 'Stimulator', k: 'dry', b: ['stonefly'], s: [8, 14], m: r(5, 9), w: ['pocket','riffle'], f: { attractor: 1 } },
+  { id: 'chubby', n: 'Chubby Chernobyl', k: 'dry', b: ['stonefly','terrestrial'], s: [6, 12], m: r(6, 9), w: ['pocket','riffle','pool'], f: { attractor: 1 } },
+  { id: 'royal', n: 'Royal Wulff', k: 'dry', b: [], s: [10, 16], m: r(5, 9), w: ['pocket','riffle'], f: { attractor: 1 } },
+  { id: 'hopper', n: "Dave's Hopper", k: 'dry', b: ['terrestrial'], s: [8, 12], m: r(7, 9), w: ['pool','riffle','pocket'], f: { sunny: 1 } },
+  { id: 'beetle', n: 'Foam Beetle', k: 'dry', b: ['terrestrial'], s: [12, 16], m: r(6, 9), w: ['pool','tail','riffle'], f: { sunny: 1 } },
+  { id: 'ant', n: 'Black Ant', k: 'dry', b: ['terrestrial'], s: [14, 18], m: r(5, 9), w: ['pool','tail','still'], f: { sunny: 1 } },
+  { id: 'griffith', n: "Griffith's Gnat", k: 'dry', b: ['midge'], s: [18, 24], m: ALL, w: ['pool','tail','still'], f: { cold: 1 } },
+  { id: 'pt', n: 'Pheasant Tail Nymph', k: 'nymph', b: ['mayfly'], s: [14, 20], m: ALL, w: ['riffle','pool','tail','pocket'] },
+  { id: 'hare', n: "Hare's Ear Nymph", k: 'nymph', b: ['mayfly','caddis'], s: [12, 18], m: ALL, w: ['riffle','pool','pocket','tail'] },
+  { id: 'zebra', n: 'Zebra Midge', k: 'nymph', b: ['midge'], s: [18, 24], m: ALL, w: ['pool','tail','still'], f: { cold: 1 } },
+  { id: 'cjohn', n: 'Copper John', k: 'nymph', b: ['mayfly'], s: [14, 18], m: ALL, w: ['riffle','pocket'], f: { attractor: 1 } },
+  { id: 'prince', n: 'Prince Nymph', k: 'nymph', b: [], s: [12, 16], m: ALL, w: ['riffle','pocket','pool'], f: { attractor: 1 } },
+  { id: 'perdigon', n: 'Perdigon', k: 'nymph', b: ['mayfly'], s: [14, 18], m: ALL, w: ['riffle','pocket'] },
+  { id: 'rubberlegs', n: "Pat's Rubber Legs", k: 'nymph', b: ['stonefly'], s: [6, 10], m: ALL, w: ['riffle','pocket'], f: { cold: 1, dirty: 1 } },
+  { id: 'worm', n: 'San Juan Worm', k: 'nymph', b: ['worm'], s: [10, 14], m: ALL, w: ['riffle','pool','tail'], f: { dirty: 1 } },
+  { id: 'egg', n: 'Egg Pattern', k: 'nymph', b: ['egg'], s: [12, 16], m: [10,11,12,1,2,3,4], w: ['riffle','pool','tail'], f: { cold: 1 } },
+  { id: 'bugger', n: 'Woolly Bugger', k: 'streamer', b: ['baitfish','leech'], s: [4, 10], m: ALL, w: ['pool','pocket','riffle','still','tail'], f: { dirty: 1, lowlight: 1 } },
+  { id: 'sculpin', n: 'Sculpin Streamer', k: 'streamer', b: ['baitfish'], s: [2, 6], m: ALL, w: ['pool','riffle','pocket'], f: { dirty: 1, lowlight: 1 } },
+  { id: 'clouser', n: 'Clouser Minnow', k: 'streamer', b: ['baitfish'], s: [2, 8], m: ALL, w: ['pool','still','riffle'], f: { dirty: 1 } },
+  { id: 'chiro', n: 'Chironomid', k: 'nymph', b: ['midge'], s: [12, 18], m: r(3, 10), w: ['still'], f: { lake: 1 } },
+  { id: 'leech', n: 'Balanced Leech', k: 'nymph', b: ['leech'], s: [8, 12], m: r(3, 11), w: ['still'], f: { lake: 1 } },
+  { id: 'callibaetis', n: 'Callibaetis Parachute', k: 'dry', b: ['mayfly'], s: [14, 16], m: r(5, 9), w: ['still'], f: { lake: 1 } },
+];
+const BYID = Object.fromEntries(FLIES.map(f => [f.id, f]));
+
+const GROUPS = [
+  ['water', 'Where are you fishing', [['riffle','Riffle'],['pool','Pool or slow run'],['pocket','Pocket water'],['tail','Tailwater'],['still','Lake or pond']]],
+  ['clarity', 'Water clarity', [['clear','Clear'],['stained','Stained'],['muddy','Muddy']]],
+  ['sky', 'Sky', [['sun','Sunny'],['cloud','Overcast'],['rain','Drizzle or rain']]],
+  ['time', 'Time of day', [['morning','Morning'],['midday','Midday'],['evening','Evening']]],
+  ['temp', 'Water temperature', [['unk','Not sure'],['cold','Under 45°F'],['cool','45–55°F'],['ideal','55–65°F'],['warm','Over 65°F']]],
+  ['rise', 'Are fish rising', [['none','No rises'],['sip','Quiet sips'],['splash','Splashy rises']]],
+];
+const SEEN = [
+  ['mayfly', 'Mayflies', 'upright sail wings'],
+  ['caddis', 'Caddis', 'tent wings, fluttering'],
+  ['stonefly', 'Stoneflies', 'big, flat wings, on rocks'],
+  ['midge', 'Midges', 'tiny, in clouds'],
+  ['terrestrial', 'Hoppers, ants, beetles', 'grass and banks'],
+  ['baitfish', 'Minnows', 'darting in the shallows'],
+];
+
+/* ---------- storage ---------- */
+const KEY = 'streamside-flypicker.v1';
+const uid = () => Math.random().toString(36).slice(2, 10);
+function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+function exampleBox() {
+  return [['padams',16,6],['pt',16,8],['hare',14,5],['ehc',14,4],['zebra',20,6],['rs2',20,3],['chubby',10,2],['bugger',8,3]]
+    .map(([id, size, count]) => ({ id: uid(), flyId: id, name: BYID[id].n, size, count, lost: 0, pending: 0 }));
+}
+const now = new Date();
+const defaultCond = { month: now.getMonth() + 1, water: 'riffle', clarity: 'clear', sky: 'sun', time: 'midday', temp: 'unk', rise: 'none', seen: [] };
+let state = load();
+if (!state || !Array.isArray(state.box)) state = { box: exampleBox(), log: [], example: true, cond: null };
+state.cond = Object.assign({}, defaultCond, state.cond || {});
+// pending = flies lost and not yet replaced
+state.box.forEach(i => { if (i.pending == null) i.pending = 0; });
+
+/* ---------- scoring ---------- */
+function score(f, c) {
+  let s = 50; const why = []; const fl = f.f || {};
+  const lake = c.water === 'still';
+  const surface = f.k === 'dry' || f.k === 'emerger';
+  const terr = f.b.includes('terrestrial');
+  if (fl.lake && !lake) s -= 60;
+  else if (lake && !f.w.includes('still')) s -= 30;
+  else if (f.w.includes(c.water)) s += 8;
+  if (fl.lake && lake) { s += 15; why.push('Made for fishing lakes and ponds'); }
+
+  const match = f.b.filter(b => c.seen.includes(b));
+  if (match.length) { s += 40; why.push('Matches the ' + BUGS[match[0]] + ' you are seeing'); }
+  else if (c.seen.length && !fl.attractor && f.k !== 'streamer') s -= 12;
+
+  if (f.m.includes(c.month)) { if (f.m.length < 12) { s += 12; why.push('In season in ' + MONTHS[c.month - 1]); } }
+  else s -= 30;
+
+  if (c.rise === 'sip') {
+    if (f.k === 'emerger') { s += 28; why.push('Quiet sips often mean fish are eating emergers just under the surface'); }
+    else if (f.k === 'dry' && f.s[1] >= 16) { s += 20; why.push('Small dry for quiet, sipping rises'); }
+    else if (!surface) s -= 10;
+  } else if (c.rise === 'splash') {
+    if (f.b.includes('caddis') && f.k !== 'nymph') { s += 25; why.push('Splashy rises usually mean fish are chasing caddis'); }
+    else if (f.k === 'dry') { s += 15; why.push('Fish are looking up'); }
+    else if (f.k === 'wet') { s += 12; why.push('Swing it through the water where fish are rising'); }
+    else s -= 10;
+  } else {
+    if (f.k === 'nymph') { s += 18; why.push('No rises, so most fish are feeding below the surface'); }
+    else if (f.k === 'streamer') s += 8;
+    else if (surface && !fl.attractor && !terr) s -= 18;
+  }
+
+  if (c.clarity === 'muddy') {
+    if (fl.dirty) { s += 28; why.push('Big, dark profile that fish can find in muddy water'); }
+    else if (f.s[1] >= 18) s -= 20;
+  } else if (c.clarity === 'stained') {
+    if (fl.dirty || fl.attractor) { s += 14; why.push('Easy for fish to see in stained water'); }
+  } else if (!fl.attractor && f.k !== 'streamer') s += 5;
+
+  if ((c.sky === 'cloud' || c.sky === 'rain') && fl.gloom) { s += 22; why.push('Blue-winged olives hatch best on gray, drizzly days'); }
+  if (c.sky === 'sun' && fl.sunny && c.time !== 'morning') { s += 12; why.push('Sun and warm afternoons put hoppers, ants and beetles on the water'); }
+  if (fl.lowlight && (c.sky !== 'sun' || c.time !== 'midday')) { s += 12; why.push('Streamers fish best in low light'); }
+  if (c.time === 'evening' && fl.evening) { s += 15; why.push('Caddis are most active in the evening'); }
+
+  if (c.temp === 'cold') {
+    if (fl.cold) { s += 18; why.push('Cold water: fish eat small, slow food near the bottom'); }
+    else if (terr) s -= 20;
+    else if (f.k === 'dry' && !f.b.includes('midge')) s -= 18;
+  } else if (c.temp === 'warm') { if (terr) s += 8; }
+  else if (c.temp === 'ideal' && surface) s += 4;
+
+  if (owned(f.id).length) s += 6;
+  return { f, s, why };
+}
+function owned(flyId) { return state.box.filter(i => i.flyId === flyId && i.count > 0); }
+function substitute(f) {
+  let best = null, bestScore = 0;
+  for (const i of state.box) {
+    if (i.count <= 0 || !i.flyId || i.flyId === f.id) continue;
+    const o = BYID[i.flyId];
+    let sc = 0;
+    if (o.k === f.k) sc += 2;
+    if (o.b.some(b => f.b.includes(b))) sc += 3;
+    if ((o.f || {}).attractor && (f.f || {}).attractor) sc += 2;
+    if (sc > bestScore) { bestScore = sc; best = i; }
+  }
+  return bestScore >= 3 ? best : null;
+}
+
+/* ---------- conditions form ---------- */
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+function buildForm() {
+  const c = state.cond;
+  let h = `<fieldset><legend>Month</legend><select id="month" style="justify-self:start">${MONTHS.map((m, i) => `<option value="${i + 1}"${c.month === i + 1 ? ' selected' : ''}>${m}</option>`).join('')}</select></fieldset>`;
+  h += `<fieldset><legend>What bugs do you see? Pick any</legend><div class="chips">${SEEN.map(([v, l, d]) =>
+    `<input type="checkbox" id="seen-${v}" name="seen" value="${v}"${c.seen.includes(v) ? ' checked' : ''}><label for="seen-${v}">${l}<small>${d}</small></label>`).join('')}</div></fieldset>`;
+  for (const [g, label, opts] of GROUPS) {
+    h += `<fieldset><legend>${label}</legend><div class="chips">${opts.map(([v, l]) =>
+      `<input type="radio" id="${g}-${v}" name="${g}" value="${v}"${c[g] === v ? ' checked' : ''}><label for="${g}-${v}">${l}</label>`).join('')}</div></fieldset>`;
+  }
+  document.getElementById('cond').innerHTML = h;
+}
+document.getElementById('cond').addEventListener('change', () => {
+  const fd = new FormData(document.getElementById('cond'));
+  state.cond = { month: +document.getElementById('month').value, seen: fd.getAll('seen') };
+  for (const [g] of GROUPS) state.cond[g] = fd.get(g);
+  save(); renderPicks();
+});
+
+function sizeRange(f) { return `#${f.s[0]}–${f.s[1]}`; }
+function renderPicks() {
+  const c = state.cond;
+  const ranked = FLIES.map(f => score(f, c)).sort((a, b) => b.s - a.s);
+  const top = ranked.slice(0, 6);
+  let h = `<div class="results-head"><h2>Best bets right now</h2><span class="meta">${MONTHS[c.month - 1]}</span></div>`;
+  if (c.temp === 'warm') h += `<p class="warn">Water over 65°F stresses trout. Fish early in the day, land fish quickly and keep them in the water.</p>`;
+  h += rigTip(top, c);
+  top.forEach((x, i) => {
+    const f = x.f, have = owned(f.id);
+    const total = have.reduce((a, b) => a + b.count, 0);
+    const benched = !have.length && state.box.some(i => i.flyId === f.id);
+    const pill = have.length
+      ? `<span class="pill ${total <= 1 ? 'low' : 'have'}">In box: ${total}</span>`
+      : benched ? `<span class="pill low">Out of rotation</span>` : `<span class="pill">Not in box</span>`;
+    let extra = '';
+    if (have.length) {
+      extra = `<div class="actions">${have.map(it => `<button class="btn lost small" type="button" data-lost="${it.id}">Lost one #${it.size} (${it.count} left)</button>`).join('')}</div>`;
+    } else {
+      const sub = substitute(f);
+      const lead = benched ? 'You lost all of these. Mark them replaced in My fly box to use them again. ' : '';
+      extra = `<p class="subnote">${lead}${sub ? `Closest thing you have now: <b>${esc(sub.name)} #${sub.size}</b>` : 'Nothing similar in your box right now.'}</p>`;
+    }
+    h += `<article class="pick"><div class="pick-head"><span class="rank">${i + 1}</span><div><h3>${esc(f.n)}</h3><div class="meta">${KIND[f.k]} · hook ${sizeRange(f)}</div></div>${pill}</div>
+      ${x.why.length ? `<ul class="why">${x.why.slice(0, 3).map(w => `<li>${w}</li>`).join('')}</ul>` : ''}${extra}</article>`;
+  });
+  h += `<p class="more">Also worth a try: ${ranked.slice(6, 10).map(x => esc(x.f.n)).join(', ')}.</p>`;
+  document.getElementById('results').innerHTML = h;
+}
+function rigTip(top, c) {
+  const dry = top.find(x => x.f.k === 'dry');
+  const nym = top.find(x => x.f.k === 'nymph');
+  const first = top[0].f;
+  if (first.k === 'streamer') return `<p class="rig"><b>How to fish it:</b> cast across the current, let the ${esc(first.n)} sink, then strip it back in short pulls with pauses.</p>`;
+  if (c.water === 'still' && first.k === 'nymph') return `<p class="rig"><b>Rig:</b> hang the ${esc(first.n)} under an indicator so it sits just off the bottom, and retrieve very slowly.</p>`;
+  if (dry && nym && c.clarity !== 'muddy') return `<p class="rig"><b>Try a dry-dropper:</b> tie on the ${esc(dry.f.n)}, then hang the ${esc(nym.f.n)} 18 to 24 inches below it. You cover the top and the middle of the water at once.</p>`;
+  const nyms = top.filter(x => x.f.k === 'nymph');
+  if (nyms.length >= 2) return `<p class="rig"><b>Two-nymph rig:</b> put the heavier ${esc(nyms[0].f.n)} first and trail the ${esc(nyms[1].f.n)} 16 inches behind it.</p>`;
+  return '';
+}
+
+/* ---------- fly box ---------- */
+const SIZES = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24];
+function renderBox() {
+  const total = state.box.reduce((a, b) => a + b.count, 0);
+  const toReplace = state.box.reduce((a, b) => a + (b.pending || 0), 0);
+  document.getElementById('boxcount').textContent = `(${total})`;
+  const yr = now.getFullYear();
+  const seasonLost = state.log.filter(l => new Date(l.t).getFullYear() === yr).length;
+  const tally = {};
+  state.log.forEach(l => { tally[l.name] = (tally[l.name] || 0) + 1; });
+  const most = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
+  document.getElementById('stats').innerHTML =
+    `<div class="stat"><div class="num">${total}</div><div class="lbl">flies in rotation</div></div>
+     <div class="stat"><div class="num lostnum">${toReplace}</div><div class="lbl">waiting to be replaced</div></div>
+     <div class="stat"><div class="num lostnum">${seasonLost}</div><div class="lbl">lost in ${yr}</div></div>`;
+  document.getElementById('mostlost').textContent = most ? `Lost most often: ${most[0]} (${most[1]})` : '';
+  document.getElementById('exbanner').hidden = !state.example;
+
+  const items = [...state.box].sort((a, b) => a.name.localeCompare(b.name) || a.size - b.size);
+  const out = items.filter(it => it.pending > 0 || it.count === 0);
+  const inRot = items.filter(it => it.count > 0);
+  document.getElementById('outblock').hidden = !out.length;
+  document.getElementById('outlist').innerHTML = out.map(it => {
+    const n = it.pending || 1;
+    const status = it.count === 0 ? 'None left' : `${it.count} still in rotation`;
+    return `<div class="row out">
+      <div style="min-width:0"><div class="name">${esc(it.name)}<span class="size">#${it.size}</span></div>
+        <div class="rmeta">${it.pending ? `${it.pending} lost` : 'Used up'} · ${status}</div></div>
+      <div class="ctrls">
+        <button class="btn primary small" type="button" data-replace="${it.id}">Replaced ${n}</button>
+        ${it.count === 0 ? `<button class="btn small" type="button" data-del="${it.id}">Remove</button>` : ''}
+      </div></div>`;
+  }).join('');
+  document.getElementById('boxlist').innerHTML = inRot.length ? inRot.map(it => {
+    const f = it.flyId && BYID[it.flyId];
+    const status = it.count === 1 ? '<span class="pill low">Last one</span>' : '';
+    return `<div class="row">
+      <div style="min-width:0"><div class="name">${esc(it.name)}<span class="size">#${it.size}</span></div>
+        <div class="rmeta">${f ? KIND[f.k] : 'Your pattern'}${it.lost ? ` · <span style="color:var(--hackle)">lost ${it.lost} total</span>` : ''} ${status}</div></div>
+      <div class="ctrls">
+        <span class="stepper"><button type="button" aria-label="One fewer" data-dec="${it.id}">−</button><span>${it.count}</span><button type="button" aria-label="One more" data-inc="${it.id}">+</button></span>
+        <button class="btn lost small" type="button" data-lost="${it.id}">Lost one</button>
+        <button class="btn small" type="button" data-del="${it.id}">Remove</button>
+      </div></div>`;
+  }).join('') : '<p class="empty">Nothing in rotation. Add the flies you carry above, or mark lost ones replaced.</p>';
+
+  document.getElementById('log').innerHTML = state.log.length
+    ? `<ul>${state.log.slice(0, 25).map(l => `<li><span>${esc(l.name)} #${l.size}</span><time>${new Date(l.t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${new Date(l.t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</time></li>`).join('')}</ul>`
+    : '<p class="subnote">Nothing lost yet. Tap "Lost one" when a fly ends up in a tree.</p>';
+}
+
+function find(id) { return state.box.find(i => i.id === id); }
+let undoFn = null, toastTimer = null;
+function toast(msg, undo) {
+  undoFn = undo;
+  document.getElementById('toastmsg').textContent = msg;
+  document.getElementById('toastundo').hidden = !undo;
+  document.getElementById('toast').hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { document.getElementById('toast').hidden = true; undoFn = null; }, 5000);
+}
+document.getElementById('toastundo').addEventListener('click', () => { if (undoFn) undoFn(); document.getElementById('toast').hidden = true; });
+
+function lostOne(id) {
+  const it = find(id); if (!it || it.count <= 0) return;
+  it.count--; it.lost++; it.pending++;
+  const entry = { t: Date.now(), itemId: it.id, name: it.name, size: it.size };
+  state.log.unshift(entry);
+  commit();
+  toast(it.count ? `Lost a ${it.name} #${it.size}. ${it.count} left.` : `Lost your last ${it.name} #${it.size}. It's out of rotation until you replace it.`, () => {
+    const i = state.log.indexOf(entry); if (i >= 0) state.log.splice(i, 1);
+    it.count++; it.lost--; it.pending--; commit();
+  });
+}
+function replaced(id) {
+  const it = find(id); if (!it) return;
+  const n = it.pending || 1;
+  it.count += n; it.pending = 0;
+  commit();
+  toast(`${n} × ${it.name} #${it.size} back in rotation.`, () => { it.count -= n; it.pending = n; commit(); });
+}
+function commit() { save(); renderBox(); renderPicks(); }
+
+const delArmed = new Set();
+document.addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.lost) lostOne(t.dataset.lost);
+  else if (t.dataset.replace) replaced(t.dataset.replace);
+  else if (t.dataset.inc) { find(t.dataset.inc).count++; commit(); }
+  else if (t.dataset.dec) { const it = find(t.dataset.dec); if (it.count > 0) { it.count--; commit(); } }
+  else if (t.dataset.del) {
+    const id = t.dataset.del;
+    if (delArmed.has(id)) { state.box = state.box.filter(i => i.id !== id); delArmed.delete(id); commit(); }
+    else { delArmed.add(id); t.textContent = 'Tap again to remove'; setTimeout(() => { delArmed.delete(id); if (t.isConnected) t.textContent = 'Remove'; }, 3000); }
+  }
+});
+
+document.getElementById('addsize').innerHTML = SIZES.map(s => `<option value="${s}"${s === 16 ? ' selected' : ''}>#${s}</option>`).join('');
+document.getElementById('patterns').innerHTML = FLIES.map(f => `<option value="${esc(f.n)}"></option>`).join('');
+document.getElementById('addform').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = document.getElementById('addname').value.trim(); if (!name) return;
+  const size = +document.getElementById('addsize').value;
+  const qty = Math.max(1, Math.min(99, +document.getElementById('addqty').value || 1));
+  const f = FLIES.find(x => x.n.toLowerCase() === name.toLowerCase());
+  const nm = f ? f.n : name;
+  const existing = state.box.find(i => i.name.toLowerCase() === nm.toLowerCase() && i.size === size);
+  if (existing) existing.count += qty;
+  else state.box.push({ id: uid(), flyId: f ? f.id : null, name: nm, size, count: qty, lost: 0, pending: 0 });
+  document.getElementById('addname').value = ''; document.getElementById('addqty').value = 1;
+  commit();
+  toast(`Added ${qty} × ${nm} #${size}.`);
+});
+document.getElementById('clearex').addEventListener('click', () => {
+  state.box = []; state.log = []; state.example = false; commit();
+});
+
+document.getElementById('copybk').addEventListener('click', () => {
+  const text = JSON.stringify({ box: state.box, log: state.log });
+  const ta = document.getElementById('bktext'); const msg = document.getElementById('bkmsg');
+  navigator.clipboard.writeText(text).then(() => { msg.textContent = 'Copied. Paste it into your notes.'; },
+    () => { ta.value = text; ta.select(); msg.textContent = 'Select all of the text above and copy it.'; });
+});
+document.getElementById('restore').addEventListener('click', () => {
+  const msg = document.getElementById('bkmsg');
+  try {
+    const d = JSON.parse(document.getElementById('bktext').value);
+    if (!Array.isArray(d.box) || !Array.isArray(d.log)) throw 0;
+    state.box = d.box; state.log = d.log; state.box.forEach(i => { if (i.pending == null) i.pending = 0; }); state.example = false; commit();
+    msg.textContent = `Restored ${d.box.length} patterns.`;
+  } catch (e) { msg.textContent = 'That text isn\'t a fly box backup. Paste the whole backup, starting with {.'; }
+});
+
+/* ---------- photo check (needs signal; runs through the viewer's Claude account) ---------- */
+let sampleApi = null, imgLimits = null, photoFiles = [], photoAbort = null;
+const photoEls = id => document.getElementById(id);
+function photoState(kind) {
+  const pill = photoEls('photostatus'), help = photoEls('photohelp');
+  photoEls('photoactions').hidden = kind !== 'ready';
+  if (kind === 'ready') {
+    pill.textContent = navigator.onLine ? 'Ready' : 'No signal';
+    pill.className = navigator.onLine ? 'pill have' : 'pill low';
+    photoEls('photogo').disabled = !photoFiles.length || !navigator.onLine;
+  } else {
+    pill.textContent = 'Not available here';
+    pill.className = 'pill';
+    help.textContent = 'Photo check only works when you open the claude.ai link with signal. The picks below work without it.';
+  }
+}
+(async () => {
+  const s = window.claude?.use ? await window.claude.use('sample') : null;
+  const lim = s ? await s.limits().catch(() => null) : null;
+  if (!lim?.images) return photoState('off');
+  sampleApi = s; imgLimits = lim.images;
+  photoEls('photofile').accept = imgLimits.mediaTypes.join(',');
+  photoState('ready');
+})();
+
+photoEls('photofile').addEventListener('change', e => {
+  const picked = [...e.target.files];
+  photoFiles = [...photoFiles, ...picked].slice(0, imgLimits.maxCount);
+  e.target.value = '';
+  photoEls('thumbs').innerHTML = '';
+  photoFiles.forEach(f => { const img = new Image(); img.alt = 'Your photo'; img.src = URL.createObjectURL(f); photoEls('thumbs').append(img); });
+  photoEls('photoclear').hidden = !photoFiles.length;
+  photoEls('photoout').innerHTML = picked.length && photoFiles.length === imgLimits.maxCount
+    ? `<p class="subnote">Up to ${imgLimits.maxCount} photos at a time.</p>` : '';
+  photoState('ready');
+});
+photoEls('photoclear').addEventListener('click', () => {
+  if (photoAbort) photoAbort.abort();
+  photoFiles = []; photoEls('thumbs').innerHTML = ''; photoEls('photoout').innerHTML = '';
+  photoEls('photoclear').hidden = true; photoState('ready');
+});
+
+function photoPrompt() {
+  const inRot = state.box.filter(i => i.count > 0).map(i => `${i.name} #${i.size} x${i.count}`).join('; ') || 'nothing listed';
+  return `You are helping a fly fisher choose a trout fly. The ${photoFiles.length} attached photo(s) were just taken at the water in ${MONTHS[state.cond.month - 1]}. Look for insects (on the water, in the air, on or under rocks, in spider webs, on the angler), the type of water, water clarity, the sky and light, and any rising fish.
+
+Reply with ONLY a JSON object with these keys:
+"summary": 1 to 3 plain sentences on what you see that matters for picking a fly.
+"insects": array of {"name": common name such as "Blue-winged olive mayfly", "size": approximate hook size as a number, or null}.
+"seen": array using only these values: mayfly, caddis, stonefly, midge, terrestrial, baitfish.
+"water": one of riffle, pool, pocket, tail, still, or null.
+"clarity": one of clear, stained, muddy, or null.
+"sky": one of sun, cloud, rain, or null.
+"rise": one of none, sip, splash, or null if the photos can't show it.
+"picks": up to 3 objects {"id": a pattern id from the list below, "size": hook size number, "why": one short reason}. Prefer flies the angler has in rotation.
+Only report what the photos actually show. Use null or [] when unsure.
+
+Pattern ids: ${FLIES.map(f => `${f.id} = ${f.n}`).join('; ')}
+Flies the angler has in rotation: ${inRot}`;
+}
+const ALLOWED = Object.fromEntries(GROUPS.map(([g, , opts]) => [g, opts.map(o => o[0])]));
+const LABELS = Object.fromEntries(GROUPS.flatMap(([g, , opts]) => opts.map(o => [g + ':' + o[0], o[1]])));
+
+photoEls('photogo').addEventListener('click', async () => {
+  const out = photoEls('photoout'), go = photoEls('photogo');
+  go.disabled = true;
+  out.innerHTML = '<p class="subnote">Looking at your photos… this can take up to a minute.</p>';
+  photoAbort = new AbortController();
+  try {
+    const res = await sampleApi.json(photoPrompt(), { images: photoFiles, signal: photoAbort.signal });
+    const changed = [];
+    for (const g of ['water', 'clarity', 'sky', 'rise']) {
+      if (ALLOWED[g].includes(res[g]) && state.cond[g] !== res[g]) { state.cond[g] = res[g]; changed.push(LABELS[g + ':' + res[g]]); }
+    }
+    const seen = (Array.isArray(res.seen) ? res.seen : []).filter(v => SEEN.some(s => s[0] === v));
+    if (seen.length) { state.cond.seen = seen; changed.push(seen.map(v => SEEN.find(s => s[0] === v)[1]).join(', ')); }
+    save(); buildForm(); renderPicks();
+    const bugs = (Array.isArray(res.insects) ? res.insects : []).slice(0, 5);
+    const picks = (Array.isArray(res.picks) ? res.picks : []).filter(p => BYID[p.id]).slice(0, 3);
+    out.innerHTML = `<div class="ai">
+      <p>${esc(res.summary || 'No clear clues in these photos.')}</p>
+      ${bugs.length ? `<div><div class="sectlabel">Bugs spotted</div><ul>${bugs.map(b => `<li>${esc(b.name)}${b.size ? ` (about #${esc(b.size)})` : ''}</li>`).join('')}</ul></div>` : ''}
+      ${picks.length ? `<div><div class="sectlabel">Claude's picks</div><ul>${picks.map(p => {
+        const have = owned(p.id).reduce((a, b) => a + b.count, 0);
+        return `<li><b>${esc(BYID[p.id].n)}</b>${p.size ? ` #${esc(p.size)}` : ''}: ${esc(p.why || '')} <span class="pill ${have ? 'have' : ''}">${have ? 'In box: ' + have : 'Not in rotation'}</span></li>`;
+      }).join('')}</ul></div>` : ''}
+      <p class="subnote">${changed.length ? `Updated your conditions: ${esc(changed.join(' · '))}. Check them below.` : 'Your conditions below were left as they were.'}</p>
+    </div>`;
+  } catch (e) {
+    const msg = {
+      cancelled: '',
+      not_granted: 'Photo check needs your OK to use Claude. Tap Read my photos again and allow it.',
+      rate_limited: 'Too many photo checks in a row. Wait a minute and try again.',
+      image_rejected: "One of those photos couldn't be read. Clear them and try JPEG or PNG photos.",
+      refused: "Claude couldn't help with these photos. Try different ones.",
+    }[e?.code] ?? "Couldn't reach Claude. Check your Starlink or signal and try again.";
+    out.innerHTML = msg ? `<p class="warn">${msg}</p>` : '';
+  } finally {
+    photoAbort = null;
+    go.disabled = !photoFiles.length || !navigator.onLine;
+  }
+});
+
+/* ---------- tabs & network ---------- */
+function showTab(name) {
+  for (const n of ['pick', 'box']) {
+    document.getElementById(n).hidden = n !== name;
+    document.getElementById('tab-' + n).setAttribute('aria-selected', n === name);
+  }
+  try { localStorage.setItem(KEY + '.tab', name); } catch (e) {}
+}
+document.getElementById('tab-pick').addEventListener('click', () => showTab('pick'));
+document.getElementById('tab-box').addEventListener('click', () => showTab('box'));
+function net() {
+  const el = document.getElementById('net');
+  el.textContent = navigator.onLine ? 'Works offline' : 'No signal · still working';
+  el.classList.toggle('off', !navigator.onLine);
+  if (sampleApi) photoState('ready');
+}
+addEventListener('online', net); addEventListener('offline', net);
+
+buildForm(); renderPicks(); renderBox(); net();
+try { if (localStorage.getItem(KEY + '.tab') === 'box' || location.hash === '#box') showTab('box'); } catch (e) {}
+// When installed from its own site, cache the page so it opens with no signal at all.
+if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+
+</body>
+</html>
