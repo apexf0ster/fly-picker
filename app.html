@@ -122,6 +122,7 @@ details .inner { display: grid; gap: 8px; margin-top: 10px; }
 textarea { width: 100%; min-height: 80px; font: 12px var(--mono); }
 
 .photo { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 10px; margin-bottom: 20px; }
+a.btn { text-decoration: none; display: inline-block; }
 .thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
 .thumbs img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
 .ai { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
@@ -156,6 +157,9 @@ textarea { width: 100%; min-height: 80px; font: 12px var(--mono); }
         <input type="file" id="photofile" accept="image/*" multiple hidden>
         <button class="btn primary" id="photogo" type="button" disabled>Read my photos</button>
         <button class="btn" id="photoclear" type="button" hidden>Clear photos</button>
+      </div>
+      <div class="actions" id="photolink" hidden>
+        <a class="btn primary" href="https://claude.ai/artifact/CJTRda9nhfJfaiAcWjE69u" target="_blank" rel="noopener">Open photo check</a>
       </div>
       <div id="thumbs" class="thumbs"></div>
       <div id="photoout" aria-live="polite"></div>
@@ -565,9 +569,14 @@ function photoState(kind) {
     pill.className = navigator.onLine ? 'pill have' : 'pill low';
     photoEls('photogo').disabled = !photoFiles.length || !navigator.onLine;
   } else {
-    pill.textContent = 'Not available here';
+    // Outside claude.ai (the home-screen app) there is no Claude to ask, so link to the claude.ai copy.
+    const away = !window.claude;
+    photoEls('photolink').hidden = !away;
+    pill.textContent = away ? 'Opens in claude.ai' : 'Not available here';
     pill.className = 'pill';
-    help.textContent = 'Photo check only works when you open the claude.ai link with signal. The picks below work without it.';
+    help.textContent = away
+      ? 'Photo check runs on claude.ai. When you have signal (your Starlink works), tap the button, sign in to Claude if asked, and add your photos there. The picks below work here with no signal.'
+      : 'Photo check only works when you open the claude.ai link with signal. The picks below work without it.';
   }
 }
 (async () => {
